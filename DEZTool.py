@@ -241,76 +241,80 @@ class DiscordTool:
                 print(f"Failed to send message: {response.status_code} | {response.text}")
 
         input("Press Enter to return to the main menu...")
-
     def delete_dms(self):
         os.system('cls' if os.name == 'nt' else 'clear')
-        user_id = input("userid of the person you want to delete your dms with: ")
+        channel_id = input("Enter the channel ID: ")
+        
+        use_delay = input("Do you want to use a delay (to avoid rate limits)? Y/N: ").lower()
+        delay = float(input("Enter the delay in seconds: ")) if use_delay == 'y' else 0
 
         headers = {"Authorization": self.token}
-        dm_channel = requests.post(f"{self.base_url}/users/@me/channels", 
-                                   json={"recipient_id": user_id}, headers=headers)
-        
-        if dm_channel.status_code == 200:
-            channel_id = dm_channel.json()["id"]
-            messages = requests.get(f"{self.base_url}/channels/{channel_id}/messages?limit=100", headers=headers).json()
+        url = f"{self.base_url}/channels/{channel_id}/messages"
 
-            while messages:
-                for msg in messages:
-                    msg_id = msg["id"]
-                    requests.delete(f"{self.base_url}/channels/{channel_id}/messages/{msg_id}", headers=headers)
-                    print(f"Deleted message: {msg_id}")
-                messages = requests.get(f"{self.base_url}/channels/{channel_id}/messages?limit=100", headers=headers).json()
-            
-            print("All messages deleted successfully.")
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            messages = response.json()
+
+            for message in messages:
+                msg_id = message["id"]
+                print(f"Deleting message ID: {msg_id}")
+                
+                delete_response = requests.delete(f"{url}/{msg_id}", headers=headers)
+                
+                if delete_response.status_code == 204:
+                    print(f"Deleted message {msg_id} successfully.")
+                else:
+                    print(f"Failed to delete message {msg_id}: {delete_response.status_code}")
+                
+                if use_delay == 'y':
+                    time.sleep(delay)
         else:
-            print(f"ailed to delete dm: {dm_channel.status_code} | {dm_channel.text}")
+            print(f"Failed to retrieve messages: {response.status_code} | {response.text}")
 
-        input("enter to go back to menu")
+        input("Press Enter to return to the main menu...")
+
+
 
     def gc_spam(self):
         os.system('cls' if os.name == 'nt' else 'clear')
         user_ids = input("Enter two user IDs separated by a comma: ").split(',')
         num_chats = int(input("Enter how many GC(s) to create: "))
-        
+
         leave_gc = input("Do you want to leave the GC(s) after they are created? Y/N: ").lower()
-        
+        delay = 0
+
         if leave_gc == 'y':
-            use_delay = input("Do you want to use a delay (to avoid rate limits and also reccomended)? y/n: ").lower()
-            delay = 0
+            use_delay = input("Do you want to use a delay (to avoid rate limits)? Y/N: ").lower()
             if use_delay == 'y':
                 delay = float(input("Enter the delay in seconds: "))
 
-            for _ in range(num_chats):
-                chat_data = {
-                    "recipients": [user_ids[0].strip(), user_ids[1].strip()]
-                }
-                response = requests.post(f"{self.base_url}/users/@me/channels", headers={"Authorization": self.token}, json=chat_data)
+        headers = {"Authorization": self.token}
 
-                if response.status_code == 200:
-                    channel_id = response.json()["id"]
-                    print("GC created.")
-               
-                    requests.delete(f"{self.base_url}/channels/{channel_id}", headers={"Authorization": self.token})
-                    print("Left GC.")
-                else:
-                    print(f"failed to create GC: {response.status_code} | {response.text}")
+        for _ in range(num_chats):
+            chat_data = {
+                "recipients": [user_ids[0].strip(), user_ids[1].strip()]
+            }
+            response = requests.post(f"{self.base_url}/users/@me/channels", headers=headers, json=chat_data)
 
-                if use_delay == 'y':
+            if response.status_code == 200:
+                gc_id = response.json()["id"]
+                print(f"GC created with ID: {gc_id}")
+
+                if leave_gc == 'y':
+                    print(f"Leaving GC {gc_id}...")
                     time.sleep(delay)
+                    leave_response = requests.delete(f"{self.base_url}/channels/{gc_id}", headers=headers)
 
-        else:  
-            for _ in range(num_chats):
-                chat_data = {
-                    "recipients": [user_ids[0].strip(), user_ids[1].strip()]
-                }
-                response = requests.post(f"{self.base_url}/users/@me/channels", headers={"Authorization": self.token}, json=chat_data)
+                    if leave_response.status_code == 204:
+                        print(f"Left GC {gc_id} successfully.")
+                    else:
+                        print(f"Failed to leave GC {gc_id}: {leave_response.status_code}")
+            else:
+                print(f"Failed to create GC: {response.status_code} | {response.text}")
 
-                if response.status_code == 200:
-                    print("GC created.")
-                else:
-                    print(f"Failed to create GC: {response.status_code} | {response.text}")
+        input("Press Enter to return to the main menu...")
 
-        input("enter to go back to menu")
 
 
 if __name__ == "__main__":
